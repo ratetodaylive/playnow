@@ -24,9 +24,14 @@ Source" on the deployed site reveals no player URL, no episode ids, nothing.
 
 ### First-time setup
 
-1. Open `encrypt.html` from this folder (double-click it, or serve it locally).
-2. Enter a password twice, fill in the player URL template and episode range.
-3. Click **Generate config.enc.js**, then **Download** (or **Copy**).
+1. Open `encrypt.html` — from the deployed site over https is easiest, and works
+   on a phone.
+2. Enter a password twice.
+3. Paste the player URL of your **first** episode into the sample box and press
+   **Fill in**. It finds the episode number, turns it into `{id}`, and sets
+   "Player id of first episode" for you. Check the preview underneath — it
+   shows the URLs for the first, second and last episodes. Set the episode
+   range, then click **Generate config.enc.js** and **Download** (or **Copy**).
 4. Save the result as `config.enc.js` in this folder, replacing the placeholder.
 5. Open `index.html`, unlock with your password to confirm it works.
 6. Commit and push. The site redeploys in about a minute.

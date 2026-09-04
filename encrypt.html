@@ -70,6 +70,14 @@
     <label for="series">Series name</label>
     <input id="series" type="text" placeholder="One Piece">
 
+    <label for="sample">Paste the player URL of your <b>first</b> episode &mdash; everything else fills itself in</label>
+    <div class="two">
+      <div style="flex:3"><input id="sample" type="text" spellcheck="false"
+             placeholder="https://host.com/player.php?id=slug?ep=2142&amp;type=hd-1&amp;category=sub"></div>
+      <div style="flex:0 0 auto"><button id="detect" type="button">Fill in</button></div>
+    </div>
+    <div class="msg" id="detectMsg"></div>
+
     <label for="tpl">Player URL template</label>
     <input id="tpl" type="text" spellcheck="false" placeholder="https://host.com/player.php?id=slug?ep={id}&amp;type=hd-1&amp;category=sub">
     <p class="note" style="margin:6px 0 0">
@@ -95,6 +103,12 @@
     <div class="check">
       <input id="sandbox" type="checkbox">
       <label for="sandbox" style="margin:0">Block pop-up ads (sandbox) &mdash; leave off if the player refuses to play</label>
+    </div>
+
+    <div id="preview" hidden style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+      <div class="note" style="margin-bottom:6px">Check these before generating:</div>
+      <div class="note" style="font-family:ui-monospace,Consolas,monospace;font-size:11.5px;
+           word-break:break-all;line-height:1.9" id="previewBody"></div>
     </div>
   </fieldset>
 
@@ -146,6 +160,54 @@ function checkPw(){
 $('pw').oninput = checkPw;
 $('pw2').oninput = checkPw;
 
+/* ---- work out which number in a sample URL is the episode counter ---- */
+function findEpisodeNumber(u){
+  var m = /[?&]ep=(\d+)/i.exec(u);
+  if(m) return {index:m.index + m[0].length - m[1].length, len:m[1].length, num:+m[1],
+                how:'the ep= parameter'};
+  var re = /[?&][A-Za-z_-]+=(\d+)(?=&|$)/g, last = null, mm;
+  while((mm = re.exec(u))) last = mm;
+  if(last) return {index:last.index + last[0].length - last[1].length, len:last[1].length,
+                   num:+last[1], how:'the last numeric parameter'};
+  re = /\d+/g; last = null;
+  while((mm = re.exec(u))) last = mm;
+  if(last) return {index:last.index, len:last[0].length, num:+last[0],
+                   how:'the last number in the URL'};
+  return null;
+}
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function buildUrl(tpl, n, idBase, firstEp){
+  var id = idBase + (n - firstEp);
+  return tpl.replace(/\{id\}/g, String(id))
+            .replace(/\{nnnn\}/g, String(n).padStart(4,'0'))
+            .replace(/\{nnn\}/g,  String(n).padStart(3,'0'))
+            .replace(/\{nn\}/g,   String(n).padStart(2,'0'))
+            .replace(/\{n\}/g,    String(n));
+}
+function updatePreview(){
+  var tpl = $('tpl').value.trim();
+  if(!tpl){ $('preview').hidden = true; return; }
+  var idBase = +$('idBase').value || 0,
+      first  = +$('first').value  || 1,
+      last   = +$('last').value   || 900;
+  $('previewBody').innerHTML =
+    'Episode ' + first + ' &rarr; ' + esc(buildUrl(tpl, first, idBase, first)) + '<br>' +
+    'Episode ' + (first + 1) + ' &rarr; ' + esc(buildUrl(tpl, first + 1, idBase, first)) + '<br>' +
+    'Episode ' + last + ' &rarr; ' + esc(buildUrl(tpl, last, idBase, first));
+  $('preview').hidden = false;
+}
+$('detect').onclick = function(){
+  var u = $('sample').value.trim();
+  if(!u) return say($('detectMsg'), 'Paste the URL of your first episode above first.', 'err');
+  var f = findEpisodeNumber(u);
+  if(!f) return say($('detectMsg'), 'No number found in that URL - fill the fields in by hand.', 'err');
+  $('tpl').value    = u.slice(0, f.index) + '{id}' + u.slice(f.index + f.len);
+  $('idBase').value = f.num;
+  say($('detectMsg'), 'Found ' + f.num + ' in ' + f.how + '. Check the preview below.', 'ok');
+  updatePreview();
+};
+['tpl','idBase','first','last'].forEach(function(id){ $(id).oninput = updatePreview; });
+
 $('gen').onclick = function(){
   var pw = $('pw').value, pw2 = $('pw2').value, tpl = $('tpl').value.trim();
   if(pw.length < 8) return say($('genMsg'), 'Set a password of at least 8 characters first.', 'err');
@@ -153,6 +215,15 @@ $('gen').onclick = function(){
   if(!tpl)          return say($('genMsg'), 'Paste the player URL template.', 'err');
   if(!/\{(id|n|nn|nnn|nnnn)\}/.test(tpl))
     return say($('genMsg'), 'The template needs a placeholder such as {id} where the episode number goes.', 'err');
+  if(/\{id\}/.test(tpl) && (+$('idBase').value || 0) === 0){
+    if(!confirm('"Player id of first episode" is still 0.\n\n' +
+                'Episode 1 would then load ...ep=0, and you would have to correct it by hand ' +
+                'on every device. Paste your first episode URL above and press "Fill in" to set ' +
+                'it automatically.\n\nGenerate anyway?')) {
+      say($('genMsg'), 'Cancelled - set the first-episode id, then generate again.', 'warn');
+      return;
+    }
+  }
   if(!window.crypto || !crypto.subtle)
     return say($('genMsg'), 'This browser cannot encrypt here. Open the file over https or use Chrome/Edge/Firefox.', 'err');
 
