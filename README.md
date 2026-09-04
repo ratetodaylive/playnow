@@ -15,69 +15,89 @@ an embedded frame, and gives you Prev / Next buttons under the player.
 - Settings panel so the player URL can be changed in the browser, no re-deploy
 - Pop-up blocking via iframe `sandbox` (toggleable, in case a host needs it off)
 
-## Current configuration
+## Password lock
 
-The `CONFIG` block near the top of the `<script>` in `index.html`:
+The library is not stored in the page. `config.enc.js` holds it encrypted with
+**AES-256-GCM**, under a key derived from your password with **PBKDF2-SHA256,
+310,000 iterations**. Without the password the file is an opaque blob — "View
+Source" on the deployed site reveals no player URL, no episode ids, nothing.
 
-```js
-var CONFIG = {
-  seriesName   : "One Piece",
-  firstEpisode : 1,
-  lastEpisode  : 900,
-  urlTemplate  : "https://gogoanime.me.uk/newplayer.php?id=one-piece-100?ep={id}&type=hd-1&category=sub",
-  idBase       : 2142,
-  sandbox      : true,
-  overrides    : {},
-  titles       : {}
-};
-```
+### First-time setup
+
+1. Open `encrypt.html` from this folder (double-click it, or serve it locally).
+2. Enter a password twice, fill in the player URL template and episode range.
+3. Click **Generate config.enc.js**, then **Download** (or **Copy**).
+4. Save the result as `config.enc.js` in this folder, replacing the placeholder.
+5. Open `index.html`, unlock with your password to confirm it works.
+6. Commit and push. The site redeploys in about a minute.
+
+To change the URL or episode count later, re-run `encrypt.html` and replace the
+file again. `encrypt.html` contains no secrets of its own — it is safe to commit.
+
+### Remembering devices
+
+Ticking **Remember this device for 90 days** stores the derived key in that
+browser's `localStorage`, so the device unlocks silently on later visits. It is
+per-browser: unlock once on your phone and once on your PC.
+
+To revoke a device you still hold, open it and press **Settings → Forget this
+device**. To revoke a device you *don't* hold, re-run `encrypt.html` with a new
+password and push — every stored key stops working.
+
+### What this does and does not protect
+
+**Does:** someone who finds the URL sees a password box and nothing else. The
+contents are genuinely encrypted, not merely hidden.
+
+**Does not:** there is no server, so an attacker who downloads `config.enc.js`
+can guess passwords offline as fast as their hardware allows, with no rate limit
+and no lockout. PBKDF2 at 310k iterations makes each guess cost real time, but a
+short or common password will still fall. **Use a long passphrase** — four or
+five unrelated words is far stronger than a short string of symbols.
+
+There is also no per-user access and no audit trail; anyone you give the
+password to has it permanently, until you re-encrypt with a new one.
+
+If you want real access control — per-person logins, revocation, server-side
+rate limiting — put the site behind Cloudflare Access instead. The two can be
+combined.
+
+## Configuration
+
+Everything below is set in `encrypt.html` and lives inside the encrypted
+`config.enc.js`. Nothing sensitive is kept in `index.html` or in this README.
 
 ### The id offset — read this if the wrong episode plays
 
-The player has its own counter that does **not** start at 1. The grid shows
-1–900; the URL uses `{id}`, computed as:
+The player has its own counter that usually does **not** start at 1. The grid
+shows 1–900; the URL uses `{id}`, computed as:
 
 ```
 id = idBase + (episode - firstEpisode)
 ```
 
-So with `idBase: 2142`:
+So an `idBase` of 2142 maps episode 1 → 2142, episode 2 → 2143, and episode
+900 → 3041.
 
-| Grid button | Player URL id |
-|---|---|
-| Episode 1   | 2142 |
-| Episode 2   | 2143 |
-| Episode 100 | 2241 |
-| Episode 900 | 3041 |
-
-**This assumes id 2142 is episode 1.** If clicking "Episode 1" plays a
-different episode, fix it with one number — open **Settings → "Player id of
-first episode"** and adjust. If 2142 is really episode *N*, set the field to
-`2142 - (N - 1)`. The current id is always shown next to the Next button, so
-you can see the mapping while you check.
+If clicking "Episode 1" plays a different episode, fix it with one number —
+**Settings → "Player id of first episode"**. If your starting id is really
+episode *N*, subtract `N - 1` from it. The current id is shown next to the Next
+button, so you can watch the mapping as you adjust it. To make the change
+permanent, re-run `encrypt.html` with the corrected value.
 
 If a few episodes break the run (specials or movies inserted into the
-sequence), pin those individually with full URLs:
+sequence), pin them individually in the `overrides` object inside the encrypted
+payload — episode number to full URL.
 
-```js
-overrides: {
-  405 : "https://gogoanime.me.uk/newplayer.php?id=one-piece-100?ep=2999&type=hd-1&category=sub"
-}
-```
-
-### Other placeholders
+### Placeholders
 
 | Placeholder | Episode 7 becomes |
 |---|---|
-| `{id}`   | `2148` (idBase + offset) |
+| `{id}`   | `idBase + 6` |
 | `{n}`    | `7`    |
 | `{nn}`   | `07`   |
 | `{nnn}`  | `007`  |
 | `{nnnn}` | `0007` |
-
-### Dub instead of sub
-
-Change `category=sub` to `category=dub` in the template.
 
 ### Settings are stored per-browser
 

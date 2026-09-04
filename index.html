@@ -69,6 +69,23 @@
   .muted{font-size:12px;color:var(--dim)}
   footer{padding:20px 14px 40px;text-align:center;color:var(--dim);font-size:12px}
   [hidden]{display:none!important}
+
+  /* lock screen */
+  #gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  #gate form{width:100%;max-width:340px;background:var(--panel);border:1px solid var(--line);
+        border-radius:14px;padding:24px}
+  #gate h1{margin:0 0 4px;font-size:18px}
+  #gate p.sub{margin:0 0 18px;color:var(--dim);font-size:13px}
+  #gate input[type=password]{width:100%;padding:11px 12px;font-size:16px;margin-bottom:12px}
+  #gate .remember{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--dim);
+        margin-bottom:16px;cursor:pointer}
+  #gate .remember input{margin:0}
+  #gate button{width:100%;padding:11px;font-weight:600}
+  #gate .msg{margin:14px 0 0;font-size:13px;min-height:19px;text-align:center}
+  #gate .msg.err{color:#ff8a8a}
+  #gate .msg.ok{color:#8ee0b4}
+  #gate .setup{margin:16px 0 0;font-size:12px;color:var(--dim);line-height:1.6}
+  #gate code{background:var(--panel2);padding:1px 5px;border-radius:4px}
   @media(max-width:600px){
     .brand small{display:none}
     .row label{min-width:100%}
@@ -76,6 +93,24 @@
 </style>
 </head>
 <body>
+
+<div id="gate">
+  <form id="gateForm" autocomplete="on">
+    <h1 id="gateTitle">Locked</h1>
+    <p class="sub" id="gateSub">Enter your password to unlock the library.</p>
+    <input id="pw" type="password" placeholder="Password" autocomplete="current-password"
+           autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label class="remember"><input id="remember" type="checkbox" checked> Remember this device for 90 days</label>
+    <button class="primary" id="unlock" type="submit">Unlock</button>
+    <p class="msg" id="gateMsg"></p>
+    <p class="setup" id="gateSetup" hidden>
+      No encrypted library found. Open <code>encrypt.html</code> from this folder,
+      set a password, and save the result as <code>config.enc.js</code> next to this page.
+    </p>
+  </form>
+</div>
+
+<div id="app" hidden>
 
 <header>
   <div class="brand" id="brand">Episode Player<small id="brandSub">1 - 900</small></div>
@@ -104,12 +139,9 @@
 
   <div class="panel" id="settings" hidden>
     <h2>Settings</h2>
-    <div class="row">
-      <label for="tpl">Player URL template</label>
-      <input id="tpl" type="text" spellcheck="false" placeholder="https://host.com/embed?ep={n}">
-    </div>
-    <div class="muted" style="margin:-4px 0 12px">
-      Placeholders: <code>{id}</code> player counter &middot; <code>{n}</code> plain number &middot; <code>{nn}</code> 2-digit (07) &middot; <code>{nnn}</code> 3-digit (007) &middot; <code>{nnnn}</code> 4-digit (0007)
+    <div class="muted" style="margin:0 0 14px">
+      The player URL is stored encrypted in <code>config.enc.js</code>. To change it,
+      re-run <code>encrypt.html</code> and replace that file.
     </div>
     <div class="row">
       <label for="idBase">Player id of first episode</label>
@@ -135,6 +167,7 @@
       <button class="primary" id="save">Save</button>
       <button id="resetSet">Reset to file defaults</button>
       <button id="clearSeen">Clear watched history</button>
+      <button id="forgetDev">Forget this device</button>
       <button id="closeSet">Close</button>
     </div>
   </div>
@@ -145,38 +178,32 @@
 
 <footer>Progress is stored in this browser only. Nothing is uploaded.</footer>
 
+</div><!-- /#app -->
+
+<script src="config.enc.js"></script>
 <script>
 /* ============================================================
-   CONFIG - edit these defaults, or use the Settings panel.
+   CONFIG lives in config.enc.js, encrypted with your password.
+   Nothing here is secret - these are only placeholders until the
+   payload is decrypted, at which point they are overwritten.
+
+   To change the player URL, episode count or id offset, open
+   encrypt.html, re-generate config.enc.js and replace the file.
 
    Placeholders usable in urlTemplate:
-     {id}   -> idBase + (episode - firstEpisode)   <-- the player's own counter
+     {id}   -> idBase + (episode - firstEpisode)   <-- player's own counter
      {n}    -> 7        {nn}   -> 07
      {nnn}  -> 007      {nnnn} -> 0007
-
-   Episode 1 -> id 2142, episode 2 -> id 2143, ... episode 900 -> id 3041.
-   If the grid number and the video do not match, change idBase (Settings ->
-   "Player id of first episode") until episode 1 plays episode 1.
    ============================================================ */
 var CONFIG = {
-  seriesName   : "One Piece",
+  seriesName   : "Player",
   firstEpisode : 1,
   lastEpisode  : 900,
-  urlTemplate  : "https://gogoanime.me.uk/newplayer.php?id=one-piece-100?ep={id}&type=hd-1&category=sub",
-  idBase       : 2142,
-
-  // sandbox:true blocks the player's pop-up/pop-under ads, but this host
-  // detects the sandbox and refuses to play ("our player is not allowed").
-  // Left off so playback works - use a browser ad blocker instead.
+  urlTemplate  : "",
+  idBase       : 0,
   sandbox      : false,
-  // Per-episode exceptions (a full URL here wins over the template):
-  overrides    : {
-    // 12: "https://host.com/embed/special-12"
-  },
-  // Optional episode titles shown next to the number:
-  titles       : {
-    // 1: "Romance Dawn"
-  }
+  overrides    : {},
+  titles       : {}
 };
 /* ========================= end config ====================== */
 
@@ -191,9 +218,12 @@ var els = {
   seenBtn:$('seenBtn'), openTab:$('openTab'), jump:$('jump'), jumpBtn:$('jumpBtn'),
   blocks:$('blocks'), grid:$('grid'), settings:$('settings'), settingsBtn:$('settingsBtn'),
   brand:$('brand'), brandSub:$('brandSub'),
-  tpl:$('tpl'), total:$('total'), first:$('first'), title:$('title'), sandbox:$('sandbox'),
+  total:$('total'), first:$('first'), title:$('title'), sandbox:$('sandbox'),
   idBase:$('idBase'), idtag:$('idtag'),
-  save:$('save'), closeSet:$('closeSet'), clearSeen:$('clearSeen')
+  save:$('save'), closeSet:$('closeSet'), clearSeen:$('clearSeen'),
+  gate:$('gate'), app:$('app'), gateForm:$('gateForm'), pw:$('pw'),
+  remember:$('remember'), unlock:$('unlock'), gateMsg:$('gateMsg'),
+  gateSetup:$('gateSetup'), gateTitle:$('gateTitle'), gateSub:$('gateSub')
 };
 
 var cfg = loadSettings();
@@ -205,12 +235,15 @@ var blockStart = cfg.firstEpisode;
 function loadSettings(){
   var base = {
     seriesName: CONFIG.seriesName, firstEpisode: CONFIG.firstEpisode,
-    lastEpisode: CONFIG.lastEpisode, urlTemplate: CONFIG.urlTemplate,
-    idBase: CONFIG.idBase, sandbox: CONFIG.sandbox
+    lastEpisode: CONFIG.lastEpisode, idBase: CONFIG.idBase, sandbox: CONFIG.sandbox
   };
   try{
     var raw = localStorage.getItem(LS_SET);
-    if(raw) Object.assign(base, JSON.parse(raw));
+    if(raw){
+      var stored = JSON.parse(raw);
+      delete stored.urlTemplate;      // the template is never persisted in the clear
+      Object.assign(base, stored);
+    }
   }catch(e){}
   return base;
 }
@@ -225,7 +258,7 @@ function pad(n,w){ return String(n).padStart(w,'0'); }
 function idFor(n){ return (Number(cfg.idBase) || 0) + (n - cfg.firstEpisode); }
 function urlFor(n){
   if(CONFIG.overrides && CONFIG.overrides[n]) return CONFIG.overrides[n];
-  var t = (cfg.urlTemplate || '').trim();
+  var t = (CONFIG.urlTemplate || '').trim();
   if(!t) return '';
   return t.replace(/\{id\}/g,   String(idFor(n)))
           .replace(/\{nnnn\}/g, pad(n,4))
@@ -331,21 +364,19 @@ function go(n, opts){
 
 /* ---------- settings panel ---------- */
 function openSettings(){
-  els.tpl.value    = cfg.urlTemplate;
   els.idBase.value = cfg.idBase;
   els.total.value  = cfg.lastEpisode;
   els.first.value  = cfg.firstEpisode;
   els.title.value  = cfg.seriesName;
   els.sandbox.checked = !!cfg.sandbox;
   els.settings.hidden = false;
-  els.tpl.focus();
+  els.idBase.focus();
 }
 els.settingsBtn.onclick = function(){
   if(els.settings.hidden) openSettings(); else els.settings.hidden = true;
 };
 els.closeSet.onclick = function(){ els.settings.hidden = true; };
 els.save.onclick = function(){
-  cfg.urlTemplate  = els.tpl.value.trim();
   cfg.idBase       = els.idBase.value === '' ? CONFIG.idBase : +els.idBase.value;
   cfg.lastEpisode  = Math.max(1, +els.total.value || CONFIG.lastEpisode);
   cfg.firstEpisode = Math.max(0, +els.first.value || 1);
@@ -417,9 +448,126 @@ function boot(startEp, rebuild){
   }
   go(n, {noScroll:true});
 
-  if(!cfg.urlTemplate) openSettings();
+  if(!CONFIG.urlTemplate) openSettings();
 }
-boot(null, false);
+
+/* ============================================================
+   Lock screen.
+
+   config.enc.js holds the library encrypted with AES-256-GCM under a
+   key derived from your password with PBKDF2-SHA256. Without the
+   password the file is an opaque blob - the player URL is not in the
+   page at all, so "View Source" reveals nothing.
+
+   "Remember this device" stores the derived key in this browser's
+   localStorage, so the device unlocks silently until the key expires
+   or you press "Forget this device".
+   ============================================================ */
+var LS_KEY = 'epplayer:devicekey:v1';
+var REMEMBER_DAYS = 90;
+var ENC = window.__PLAYER_ENC__ || null;
+
+function b64ToBuf(b64){
+  var bin = atob(b64), out = new Uint8Array(bin.length);
+  for(var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function bufToB64(buf){
+  var bytes = new Uint8Array(buf), s = '';
+  for(var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+function deriveKey(password, saltB64, iters){
+  return crypto.subtle
+    .importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey'])
+    .then(function(base){
+      return crypto.subtle.deriveKey(
+        {name:'PBKDF2', salt:b64ToBuf(saltB64), iterations:iters, hash:'SHA-256'},
+        base, {name:'AES-GCM', length:256}, true, ['decrypt']);
+    });
+}
+function decryptWith(key){
+  return crypto.subtle
+    .decrypt({name:'AES-GCM', iv:b64ToBuf(ENC.iv)}, key, b64ToBuf(ENC.ct))
+    .then(function(plain){ return JSON.parse(new TextDecoder().decode(plain)); });
+}
+function applyPayload(p){
+  Object.assign(CONFIG, p);
+  cfg = loadSettings();
+  els.gate.hidden = true;
+  els.app.hidden = false;
+  boot(null, false);
+}
+function rememberKey(key){
+  return crypto.subtle.exportKey('raw', key).then(function(raw){
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        k: bufToB64(raw), exp: Date.now() + REMEMBER_DAYS * 86400000
+      }));
+    }catch(e){}
+  });
+}
+function forgetKey(){ try{ localStorage.removeItem(LS_KEY); }catch(e){} }
+
+function tryRemembered(){
+  var raw = null;
+  try{ raw = localStorage.getItem(LS_KEY); }catch(e){}
+  if(!raw) return Promise.resolve(false);
+  var rec = null;
+  try{ rec = JSON.parse(raw); }catch(e){}
+  if(!rec || !rec.k || !rec.exp || Date.now() > rec.exp){ forgetKey(); return Promise.resolve(false); }
+  return crypto.subtle
+    .importKey('raw', b64ToBuf(rec.k), {name:'AES-GCM'}, true, ['decrypt'])
+    .then(decryptWith)
+    .then(function(p){ applyPayload(p); return true; })
+    .catch(function(){ forgetKey(); return false; });
+}
+
+els.gateForm.onsubmit = function(e){
+  e.preventDefault();
+  if(!ENC || !els.pw.value) return;
+  els.unlock.disabled = true;
+  els.gateMsg.className = 'msg';
+  els.gateMsg.textContent = 'Unlocking…';
+  deriveKey(els.pw.value, ENC.salt, ENC.iters)
+    .then(function(key){
+      return decryptWith(key).then(function(p){
+        var saved = els.remember.checked ? rememberKey(key) : Promise.resolve();
+        return saved.then(function(){ els.pw.value = ''; applyPayload(p); });
+      });
+    })
+    .catch(function(){
+      els.gateMsg.className = 'msg err';
+      els.gateMsg.textContent = 'Wrong password.';
+      els.pw.select();
+    })
+    .then(function(){ els.unlock.disabled = false; });
+};
+
+$('forgetDev').onclick = function(){
+  forgetKey();
+  els.settings.hidden = true;
+  alert('Done. This device will ask for the password next time you open the page.');
+};
+
+function lockDown(title, sub, showSetup){
+  els.gateTitle.textContent = title;
+  els.gateSub.textContent = sub;
+  els.gateSetup.hidden = !showSetup;
+  els.pw.disabled = true;
+  els.unlock.disabled = true;
+}
+(function start(){
+  if(!ENC || !ENC.ct){
+    lockDown('Setup needed', 'This page has no encrypted library yet.', true);
+    return;
+  }
+  if(!window.crypto || !crypto.subtle){
+    lockDown('Unavailable', 'This browser cannot decrypt the library. Open the page over https.', false);
+    return;
+  }
+  tryRemembered().then(function(ok){ if(!ok) els.pw.focus(); });
+})();
 </script>
 </body>
 </html>
