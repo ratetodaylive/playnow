@@ -15,43 +15,76 @@ an embedded frame, and gives you Prev / Next buttons under the player.
 - Settings panel so the player URL can be changed in the browser, no re-deploy
 - Pop-up blocking via iframe `sandbox` (toggleable, in case a host needs it off)
 
-## Setup — the only thing you must change
+## Current configuration
 
-Open `index.html` and edit the `CONFIG` block near the top of the `<script>`:
+The `CONFIG` block near the top of the `<script>` in `index.html`:
 
 ```js
 var CONFIG = {
-  seriesName   : "My Series",
+  seriesName   : "One Piece",
   firstEpisode : 1,
   lastEpisode  : 900,
-  urlTemplate  : "https://host.com/embed/anime?ep={n}",
+  urlTemplate  : "https://gogoanime.me.uk/newplayer.php?id=one-piece-100?ep={id}&type=hd-1&category=sub",
+  idBase       : 2142,
   sandbox      : true,
   overrides    : {},
   titles       : {}
 };
 ```
 
-`urlTemplate` is your player URL with the episode number replaced by a placeholder:
+### The id offset — read this if the wrong episode plays
+
+The player has its own counter that does **not** start at 1. The grid shows
+1–900; the URL uses `{id}`, computed as:
+
+```
+id = idBase + (episode - firstEpisode)
+```
+
+So with `idBase: 2142`:
+
+| Grid button | Player URL id |
+|---|---|
+| Episode 1   | 2142 |
+| Episode 2   | 2143 |
+| Episode 100 | 2241 |
+| Episode 900 | 3041 |
+
+**This assumes id 2142 is episode 1.** If clicking "Episode 1" plays a
+different episode, fix it with one number — open **Settings → "Player id of
+first episode"** and adjust. If 2142 is really episode *N*, set the field to
+`2142 - (N - 1)`. The current id is always shown next to the Next button, so
+you can see the mapping while you check.
+
+If a few episodes break the run (specials or movies inserted into the
+sequence), pin those individually with full URLs:
+
+```js
+overrides: {
+  405 : "https://gogoanime.me.uk/newplayer.php?id=one-piece-100?ep=2999&type=hd-1&category=sub"
+}
+```
+
+### Other placeholders
 
 | Placeholder | Episode 7 becomes |
 |---|---|
+| `{id}`   | `2148` (idBase + offset) |
 | `{n}`    | `7`    |
 | `{nn}`   | `07`   |
 | `{nnn}`  | `007`  |
 | `{nnnn}` | `0007` |
 
-Examples:
+### Dub instead of sub
 
-```
-https://host.com/embed?ep={n}
-https://host.com/watch/my-series-episode-{n}
-https://host.com/v/{nnn}/index.html
-https://host.com/e/{n}?sub=1&autoplay=1
-```
+Change `category=sub` to `category=dub` in the template.
 
-You can also set it at runtime: open the page, click **Settings**, paste the
-template, Save. That value is stored in your browser and survives reloads —
-handy for testing before you commit.
+### Settings are stored per-browser
+
+Anything you save in the **Settings** panel is kept in that browser's
+`localStorage` and **overrides the values in the file**. If you edit `CONFIG`
+in `index.html` and the page ignores your change, click **Settings → Reset to
+file defaults**.
 
 ### Episodes that break the pattern
 
@@ -75,7 +108,19 @@ Titles show in the "now playing" bar and as a tooltip on each grid button.
 
 ## Deploy to GitHub Pages (free)
 
-1. Create a new **public** repo on GitHub, e.g. `episode-player`.
+GitHub Pages is only free on **public** repos. Two ways to get one:
+
+**A. New repo (easiest)** — at <https://github.com/new>, enter the name,
+select the **Public** radio button, leave "Add a README" unchecked, Create.
+
+**B. Repo already exists and is private** — open the repo → **Settings** (top
+tab) → **General** → scroll to the bottom, **Danger Zone** → **Change
+repository visibility** → **Change to public** → tick the warnings, type the
+repo name to confirm.
+
+Then:
+
+1. Create the public repo, e.g. `episode-player`.
 2. Push this folder:
 
 ```bash
