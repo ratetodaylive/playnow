@@ -93,6 +93,7 @@
     <button id="prev">&#9664; Prev</button>
     <div class="now" id="now">Episode <span>-</span></div>
     <button id="next">Next &#9654;</button>
+    <span class="muted" id="idtag"></span>
     <div class="spacer"></div>
     <button id="seenBtn">Mark watched</button>
     <button id="openTab">Open in new tab</button>
@@ -106,7 +107,12 @@
       <input id="tpl" type="text" spellcheck="false" placeholder="https://host.com/embed?ep={n}">
     </div>
     <div class="muted" style="margin:-4px 0 12px">
-      Placeholders: <code>{n}</code> plain number &middot; <code>{nn}</code> 2-digit (07) &middot; <code>{nnn}</code> 3-digit (007) &middot; <code>{nnnn}</code> 4-digit (0007)
+      Placeholders: <code>{id}</code> player counter &middot; <code>{n}</code> plain number &middot; <code>{nn}</code> 2-digit (07) &middot; <code>{nnn}</code> 3-digit (007) &middot; <code>{nnnn}</code> 4-digit (0007)
+    </div>
+    <div class="row">
+      <label for="idBase">Player id of first episode</label>
+      <input id="idBase" type="number" style="width:140px">
+      <span class="muted">Episode 1 uses this id; each later episode adds 1.</span>
     </div>
     <div class="row">
       <label for="total">Last episode</label>
@@ -125,6 +131,7 @@
     </div>
     <div class="row" style="margin-top:12px">
       <button class="primary" id="save">Save</button>
+      <button id="resetSet">Reset to file defaults</button>
       <button id="clearSeen">Clear watched history</button>
       <button id="closeSet">Close</button>
     </div>
@@ -139,14 +146,22 @@
 <script>
 /* ============================================================
    CONFIG - edit these defaults, or use the Settings panel.
-   {n}    -> 7        {nn}   -> 07
-   {nnn}  -> 007      {nnnn} -> 0007
+
+   Placeholders usable in urlTemplate:
+     {id}   -> idBase + (episode - firstEpisode)   <-- the player's own counter
+     {n}    -> 7        {nn}   -> 07
+     {nnn}  -> 007      {nnnn} -> 0007
+
+   Episode 1 -> id 2142, episode 2 -> id 2143, ... episode 900 -> id 3041.
+   If the grid number and the video do not match, change idBase (Settings ->
+   "Player id of first episode") until episode 1 plays episode 1.
    ============================================================ */
 var CONFIG = {
-  seriesName   : "Episode Player",
+  seriesName   : "One Piece",
   firstEpisode : 1,
   lastEpisode  : 900,
-  urlTemplate  : "",                 // e.g. "https://host.com/embed/anime?ep={n}"
+  urlTemplate  : "https://gogoanime.me.uk/newplayer.php?id=one-piece-100?ep={id}&type=hd-1&category=sub",
+  idBase       : 2142,
   sandbox      : true,
   // Per-episode exceptions (a full URL here wins over the template):
   overrides    : {
@@ -171,6 +186,7 @@ var els = {
   blocks:$('blocks'), grid:$('grid'), settings:$('settings'), settingsBtn:$('settingsBtn'),
   brand:$('brand'), brandSub:$('brandSub'),
   tpl:$('tpl'), total:$('total'), first:$('first'), title:$('title'), sandbox:$('sandbox'),
+  idBase:$('idBase'), idtag:$('idtag'),
   save:$('save'), closeSet:$('closeSet'), clearSeen:$('clearSeen')
 };
 
@@ -183,7 +199,8 @@ var blockStart = cfg.firstEpisode;
 function loadSettings(){
   var base = {
     seriesName: CONFIG.seriesName, firstEpisode: CONFIG.firstEpisode,
-    lastEpisode: CONFIG.lastEpisode, urlTemplate: CONFIG.urlTemplate, sandbox: CONFIG.sandbox
+    lastEpisode: CONFIG.lastEpisode, urlTemplate: CONFIG.urlTemplate,
+    idBase: CONFIG.idBase, sandbox: CONFIG.sandbox
   };
   try{
     var raw = localStorage.getItem(LS_SET);
@@ -199,17 +216,22 @@ function saveSeen(){ try{ localStorage.setItem(LS_SEEN, JSON.stringify(Array.fro
 
 /* ---------- url building ---------- */
 function pad(n,w){ return String(n).padStart(w,'0'); }
+function idFor(n){ return (Number(cfg.idBase) || 0) + (n - cfg.firstEpisode); }
 function urlFor(n){
   if(CONFIG.overrides && CONFIG.overrides[n]) return CONFIG.overrides[n];
   var t = (cfg.urlTemplate || '').trim();
   if(!t) return '';
-  return t.replace(/\{nnnn\}/g, pad(n,4))
+  return t.replace(/\{id\}/g,   String(idFor(n)))
+          .replace(/\{nnnn\}/g, pad(n,4))
           .replace(/\{nnn\}/g,  pad(n,3))
           .replace(/\{nn\}/g,   pad(n,2))
           .replace(/\{n\}/g,    String(n));
 }
 function titleOf(n){ return (CONFIG.titles && CONFIG.titles[n]) || ''; }
-function labelFor(n){ var t = titleOf(n); return t ? ('Episode ' + n + ' - ' + t) : ('Episode ' + n); }
+function labelFor(n){
+  var t = titleOf(n);
+  return 'Episode ' + n + (t ? ' - ' + t : '') + '  (id ' + idFor(n) + ')';
+}
 
 /* ---------- rendering ---------- */
 function renderBlocks(){
@@ -282,6 +304,7 @@ function go(n, opts){
 
   var t = titleOf(n);
   els.now.innerHTML = 'Episode <span>' + n + (t ? ' - ' + t : '') + '</span>';
+  els.idtag.textContent = 'player id ' + idFor(n);
   els.prev.disabled = n <= cfg.firstEpisode;
   els.next.disabled = n >= cfg.lastEpisode;
   els.openTab.disabled = !url;
@@ -302,10 +325,11 @@ function go(n, opts){
 
 /* ---------- settings panel ---------- */
 function openSettings(){
-  els.tpl.value   = cfg.urlTemplate;
-  els.total.value = cfg.lastEpisode;
-  els.first.value = cfg.firstEpisode;
-  els.title.value = cfg.seriesName;
+  els.tpl.value    = cfg.urlTemplate;
+  els.idBase.value = cfg.idBase;
+  els.total.value  = cfg.lastEpisode;
+  els.first.value  = cfg.firstEpisode;
+  els.title.value  = cfg.seriesName;
   els.sandbox.checked = !!cfg.sandbox;
   els.settings.hidden = false;
   els.tpl.focus();
@@ -316,6 +340,7 @@ els.settingsBtn.onclick = function(){
 els.closeSet.onclick = function(){ els.settings.hidden = true; };
 els.save.onclick = function(){
   cfg.urlTemplate  = els.tpl.value.trim();
+  cfg.idBase       = els.idBase.value === '' ? CONFIG.idBase : +els.idBase.value;
   cfg.lastEpisode  = Math.max(1, +els.total.value || CONFIG.lastEpisode);
   cfg.firstEpisode = Math.max(0, +els.first.value || 1);
   if(cfg.firstEpisode > cfg.lastEpisode) cfg.firstEpisode = 1;
@@ -324,6 +349,13 @@ els.save.onclick = function(){
   saveSettings();
   els.settings.hidden = true;
   boot(current || cfg.firstEpisode, true);
+};
+$('resetSet').onclick = function(){
+  try{ localStorage.removeItem(LS_SET); }catch(e){}
+  cfg = loadSettings();
+  openSettings();
+  boot(current || cfg.firstEpisode, true);
+  els.settings.hidden = false;
 };
 els.clearSeen.onclick = function(){
   if(!confirm('Clear watched marks for all episodes?')) return;
