@@ -166,10 +166,10 @@ same-origin, forms and fullscreen but withholds `allow-popups` and
 `allow-top-navigation` — which blocks the pop-under ads and tab-hijack
 redirects these hosts run.
 
-**It is off by default**, because gogoanime detects the sandbox and refuses to
-play ("our player is not allowed"). That is deliberate on their side: the ads
-are how the host is paid, so blocking them blocks playback. There is no
-setting that keeps both.
+**It is off by default**, because the player host detects the sandbox and
+refuses to play ("our player is not allowed"). That is deliberate on their
+side: the ads are how the host is paid, so blocking them blocks playback.
+There is no setting that keeps both.
 
 With the sandbox off, use a browser content blocker (uBlock Origin) instead —
 it filters the ads without the player being able to tell it is being sandboxed.
