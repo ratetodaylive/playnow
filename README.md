@@ -138,18 +138,33 @@ git push -u origin main
 
 Every later change is just `git push` — Pages redeploys itself.
 
-## If the video does not appear
+## The sandbox setting
 
-Many video hosts send `X-Frame-Options: DENY` or a `Content-Security-Policy:
-frame-ancestors` header, which blocks *any* site from embedding them. That is
-enforced by the browser and cannot be worked around from a static page.
+`sandbox` is an iframe attribute that strips the embedded page's privileges
+unless they are granted back individually. When on, this page grants scripts,
+same-origin, forms and fullscreen but withholds `allow-popups` and
+`allow-top-navigation` — which blocks the pop-under ads and tab-hijack
+redirects these hosts run.
 
-Two things to try, in order:
+**It is off by default**, because gogoanime detects the sandbox and refuses to
+play ("our player is not allowed"). That is deliberate on their side: the ads
+are how the host is paid, so blocking them blocks playback. There is no
+setting that keeps both.
 
-1. **Settings → uncheck "Block pop-ups (sandbox)"** — some players need
-   permissions the sandbox withholds.
-2. Use the **Open in new tab** button. The episode list, prev/next and progress
-   tracking all still work; only the inline embed is unavailable.
+With the sandbox off, use a browser content blocker (uBlock Origin) instead —
+it filters the ads without the player being able to tell it is being sandboxed.
+
+## If the video still does not appear
+
+1. Some hosts send `X-Frame-Options: DENY` or a `Content-Security-Policy:
+   frame-ancestors` header, which blocks *any* site from embedding them. That
+   is enforced by the browser and cannot be worked around from a static page.
+2. If the player reports the *domain* is not allowed, it is checking the
+   `Referer` header. Find `f.referrerPolicy = 'no-referrer';` in `index.html`
+   and delete that line so the browser sends your Pages origin instead.
+3. Failing both, use the **Open in new tab** button. The episode list,
+   prev/next and progress tracking all still work; only the inline embed is
+   unavailable.
 
 ## Notes
 

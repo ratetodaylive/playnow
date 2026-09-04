@@ -125,9 +125,9 @@
       <input id="title" type="text" placeholder="My Series">
     </div>
     <div class="row">
-      <label for="sandbox">Block pop-ups (sandbox)</label>
-      <input id="sandbox" type="checkbox" checked>
-      <span class="muted">Turn off if the player refuses to play.</span>
+      <label for="sandbox">Block pop-up ads (sandbox)</label>
+      <input id="sandbox" type="checkbox">
+      <span class="muted">This host refuses to play when sandboxed - leave unticked.</span>
     </div>
     <div class="row" style="margin-top:12px">
       <button class="primary" id="save">Save</button>
@@ -162,7 +162,11 @@ var CONFIG = {
   lastEpisode  : 900,
   urlTemplate  : "https://gogoanime.me.uk/newplayer.php?id=one-piece-100?ep={id}&type=hd-1&category=sub",
   idBase       : 2142,
-  sandbox      : true,
+
+  // sandbox:true blocks the player's pop-up/pop-under ads, but this host
+  // detects the sandbox and refuses to play ("our player is not allowed").
+  // Left off so playback works - use a browser ad blocker instead.
+  sandbox      : false,
   // Per-episode exceptions (a full URL here wins over the template):
   overrides    : {
     // 12: "https://host.com/embed/special-12"
